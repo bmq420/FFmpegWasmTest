@@ -5,6 +5,13 @@ import ReactPlayer from "react-player";
 import videojs from "video.js";
 import VideoJS from "./VideoJS";
 import { saveAs, readAsText } from "file-saver";
+import { mediaInfoFactory } from "mediainfo.js";
+import type { ReadChunkFunc, MediaInfo } from 'mediainfo.js'
+
+function makeReadChunk(file) {
+  return async (chunkSize: number, offset: number) =>
+    new Uint8Array(await file.slice(offset, offset + chunkSize).arrayBuffer());
+}
 
 export default function App() {
   const [videoList, setVideoList] = useState<
@@ -250,6 +257,19 @@ export default function App() {
     }
   };
 
+  const nonTranscode = async () => {
+    const file = inputRef.current?.files?.[0];
+    if (!file) {
+      alert("Please select a file first.");
+      return;
+    }
+    const fileURL = URL.createObjectURL(file);
+
+    if (videoRef.current !== null) {
+      videoRef.current.src = fileURL;
+    }
+  };
+
   const [videoJsOptions, setVideoJsOptions] = useState({
     autoplay: true,
     controls: true,
@@ -328,56 +348,47 @@ export default function App() {
     };
   }, []);
 
-  const [codec, setCodec] = useState("");
+  const mediaInfoRef = useRef()
+  const [result, setResult] = useState('')
 
-  console.log(codec)
+  useEffect(() => {
+    mediaInfoFactory({
+      format: 'text',
+      // locateFile: (filename) => filename,
+    })
+      .then((mi) => {
+        console.log(mi)
+        mediaInfoRef.current = mi
+      })
+      .catch((error: unknown) => {
+        console.error(error)
+      })
 
-  const detectCodec = async (file) => {
-    const fileType = file.type;
-    const vid = document.createElement('video');
-    console.log(vid)
-    console.log("can play", vid.canPlayType("video/mp4; codecs=hev1,mp4a.40.2" ));
-
-    if (fileType === "video/mp4") {
-      console.log("here")
-      console.log(fileType)
-      console.log(file)
-      console.log("h254", file.canPlayType("video/mp4; codecs=avc1.42E01E,mp4a.40.2"));
-      console.log("h265", file.canPlayType("video/mp4; codecs=hev1,mp4a.40.2"));
-
-      // const arrayBuffer = await file.arrayBuffer();
-      // const uint8Array = new Uint8Array(arrayBuffer);
-
-      // // Check the first few bytes for specific patterns
-      // const avc1 = uint8Array.includes("avc1".charCodeAt(0));
-      // const hev1 =
-      //   uint8Array.includes("hev1".charCodeAt(0)) ||
-      //   uint8Array.includes("hvc1".charCodeAt(0));
-
-      // if (avc1) {
-      //   setCodec("H.264");
-      // } else if (hev1) {
-      //   setCodec("H.265");
-      // } else {
-      //   setCodec("Unknown or unsupported codec");
-      // }
-    } else {
-      setCodec("Unsupported file type");
+    return () => {
+      if (mediaInfoRef.current) {
+        mediaInfoRef.current.close()
+      }
     }
-  };
+  }, [])
+  console.log(result)
 
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      detectCodec(file);
+  const handleChange = (ev) => {
+    console.log(mediaInfoRef.current)
+    const file = ev.target.files?.[0]
+    if (file && mediaInfoRef.current) {
+      mediaInfoRef.current
+        .analyzeData(file.size, makeReadChunk(file))
+        .then(setResult)
+        .catch((error: unknown) => {
+          console.error(error)
+        })
     }
-  };
-
+  }
   return (
     <>
       <div>
-        <input type="file" onChange={handleFileChange} />
-        <p>Detected codec: {codec}</p>
+        <input type="file" onChange={handleChange} />
+        <pre>{result}</pre>
       </div>
 
       <video ref={videoRef} controls></video>
