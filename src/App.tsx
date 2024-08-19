@@ -6,7 +6,7 @@ import videojs from "video.js";
 import VideoJS from "./VideoJS";
 import { saveAs, readAsText } from "file-saver";
 import { mediaInfoFactory } from "mediainfo.js";
-import type { ReadChunkFunc, MediaInfo } from 'mediainfo.js'
+import type { ReadChunkFunc, MediaInfo } from "mediainfo.js";
 
 function makeReadChunk(file) {
   return async (chunkSize: number, offset: number) =>
@@ -217,6 +217,8 @@ export default function App() {
   };
 
   const transcodeToMp4 = async () => {
+    const startTime = Date.now();
+    const startMemory = performance.memory.usedJSHeapSize;
     try {
       const file = inputRef.current?.files?.[0];
       if (!file) {
@@ -225,11 +227,11 @@ export default function App() {
       }
       const ffmpeg = ffmpegRef.current;
       await ffmpeg.writeFile(
-        "input.mp4",
+        "input.flv",
         new Uint8Array(await file.arrayBuffer())
       );
 
-      await ffmpeg.exec(["-i", "input.mp4", "output.mp4"]);
+      await ffmpeg.exec(["-i", "input.flv", "output.mp4"]);
 
       //mp4 file
       const mp4File = await ffmpeg.readFile("output.mp4");
@@ -255,6 +257,12 @@ export default function App() {
     } catch (error) {
       console.error("Error:", error);
     }
+    const endTime = Date.now();
+    const endMemory = performance.memory.usedJSHeapSize;
+
+    console.log("Time taken:", endTime - startTime, "ms");
+    const memoryUsage = endMemory - startMemory;
+    console.log(`Memory usage: ${memoryUsage} bytes`);
   };
 
   const nonTranscode = async () => {
@@ -348,53 +356,62 @@ export default function App() {
     };
   }, []);
 
-  const mediaInfoRef = useRef()
-  const [result, setResult] = useState('')
+  const mediaInfoRef = useRef();
+  const [result, setResult] = useState("");
 
   useEffect(() => {
     mediaInfoFactory({
-      format: 'text',
+      format: "text",
       // locateFile: (filename) => filename,
     })
       .then((mi) => {
-        console.log(mi)
-        mediaInfoRef.current = mi
+        console.log(mi);
+        mediaInfoRef.current = mi;
       })
       .catch((error: unknown) => {
-        console.error(error)
-      })
+        console.error(error);
+      });
 
     return () => {
       if (mediaInfoRef.current) {
-        mediaInfoRef.current.close()
+        mediaInfoRef.current.close();
       }
-    }
-  }, [])
-  console.log(result)
+    };
+  }, []);
+
+  function test() {
+    console.log(result)
+    const videoTrack = result.media.track.find(
+      (track) => track["@type"] === "Video"
+    );
+    console.log(videoTrack)
+    return videoTrack ? videoTrack.Format : "Unknown";
+  }
 
   const handleChange = (ev) => {
-    console.log(mediaInfoRef.current)
-    const file = ev.target.files?.[0]
+    console.log(mediaInfoRef.current);
+    const file = ev.target.files?.[0];
     if (file && mediaInfoRef.current) {
       mediaInfoRef.current
         .analyzeData(file.size, makeReadChunk(file))
         .then(setResult)
         .catch((error: unknown) => {
-          console.error(error)
-        })
+          console.error(error);
+        });
     }
-  }
+  };
   return (
     <>
       <div>
         <input type="file" onChange={handleChange} />
         <pre>{result}</pre>
+        <button onClick={test}>nigga</button>
       </div>
 
       <video ref={videoRef} controls></video>
       <br />
       <input type="file" ref={inputRef} />
-      <button onClick={transcodeToFLV} disabled={!loaded}>
+      <button onClick={transcodeToMp4} disabled={!loaded}>
         Transcode to HLS
       </button>
       {/* {loadError && <p>{loadError}</p>} */}

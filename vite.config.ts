@@ -1,9 +1,13 @@
-import path from 'path'
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { viteStaticCopy } from 'vite-plugin-static-copy'
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
-// https://vitejs.dev/config/
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+console.log(path.join(__dirname, "node_modules", "mediainfo.js", "dist", "MediaInfoModule.wasm"));
+
 export default defineConfig({
   plugins: [
     react(),
